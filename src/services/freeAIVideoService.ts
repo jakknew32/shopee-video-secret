@@ -308,8 +308,8 @@ export async function generateVideoFromText(
   }
   
   // Try Replicate for Stable Video Diffusion
-  if (config.replicateApiKey && imageUrls.length > 0) {
-    // Would need an initial image first
+  if (config.replicateApiKey) {
+    // Would need an initial image first - could be implemented later
   }
   
   return null;

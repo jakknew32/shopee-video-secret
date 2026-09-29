@@ -5,6 +5,7 @@
 - 🚀 **Grok (xAI Grok-2 / Grok-Beta)**
 - 🟣 **Meta AI (Llama 3.3 / Llama 3.1)**
 - ⚡ **Smart Auto Optimizer** (ระบบ AI จำลองอัจฉริยะ ใช้งานได้ทันที 100% แม้ไม่มี API Key)
+- 🤖 **Free AI Video Generation** (Hugging Face, Replicate, Local Models - **ฟรี 100%**)
 
 ---
 
@@ -13,7 +14,7 @@
 ### 1. 🧡 ระบบดึงรูป & ข้อมูลสินค้าจาก Shopee (Shopee Auto-Extractor)
 - **วางลิงก์ Shopee หรือข้อความแชร์**: รองรับทั้ง `https://shopee.co.th/...` และ Short Link `https://s.shopee.co.th/...`
 - **ดึงคลังรูปภาพสินค้าความละเอียดสูง**: ดึงภาพสินค้าหลายมุม และนำไปจัดใส่ทั้ง 5 ฉาก (Hook → Pain Point → Reveal → Proof → CTA) ให้โดยอัตโนมัติ
-- **ดึงสเปกและรีวิวสินค้า**: ดึงราคาจริง, ราคาเต็ม, ส่วนลด %, คะแนนดาวรีวิว และยอดขาย มาช่วยคำนวณสคริปต์ที่น่าเชื่อถือ
+- **ดึงสเปคและรีวิวสินค้า**: ดึงราคาจริง, ราคาเต็ม, ส่วนลด %, คะแนนดาวรีวิว และยอดขาย มาช่วยคำนวณสคริปต์ที่น่าเชื่อถือ
 - **มีคลังสินค้าฮิตในตัว**: สามารถคลิกเลือกตัวอย่างสินค้าขายดี (หูฟัง ANC, หม้อทอดไร้น้ำมัน, เซรั่มไฮยา, แก้วเก็บความเย็น 304, ไมค์ไร้สาย) เพื่อทดลองดึงรูปและประกอบคลิปได้ทันที
 
 ### 2. ⚙️ ตัวเลือกปรับแต่ง AI Prompt & Persona แบบละเอียด (Custom Prompt System)
@@ -48,6 +49,14 @@
 - **เรนเดอร์วิดีโอ 9:16**: บันทึกภาพแอนิเมชันและเสียงรวมเป็นไฟล์วิดีโอ (.webm / .mp4 HD) ดาวน์โหลดได้ทันที
 - **Copywriter Assistant**: 1-Click คัดลอกแคปชั่นป้ายยา, แฮชแท็กไวรัล และสคริปต์คำพูด
 
+### 6. 🤖 Free AI Video Generation (ใหม่! - ฟรี 100%)
+- **Text-to-Image ฟรี**: SDXL Turbo, Flux Schnell, Playground v2.5 ผ่าน Hugging Face Inference API
+- **Text-to-Video ฟรี**: ModelScope DAMO, ZeroScope V2 (ความละเอียดต่ำ เหมาะสำหรับทดสอบ)
+- **Image-to-Video ฟรี**: Stable Video Diffusion XT ผ่าน Replicate (เครดิตฟรี $10/เดือน)
+- **Local Models**: Transformers.js / ONNX ใช้งานออฟไลน์ 100%
+- **Best Practice Pipeline**: Text-to-Image → Canvas Composer → Video Export (คุณภาพดีที่สุด ฟรีจริง)
+- **No Credit Card Required**: ไม่ต้องผูกบัตรเครดิต ใช้งานได้ทันที
+
 ---
 
 ## 🛠️ วิธีการเปิดใช้งานบน Google Chrome
@@ -65,9 +74,31 @@ npm run dev
 
 ## 🔑 การตั้งค่า API Keys (ไม่บังคับ)
 
+### AI แบบจ่าย/พรีเมียม (มี Free Tier)
 1. คลิกที่ปุ่ม **"API Keys"** บนแถบเมนูด้านบน
 2. เลือกใส่ API Key ตามที่ต้องการ:
    - **Google Flow (Gemini)**: ขอคีย์ฟรีได้ที่ [Google AI Studio](https://aistudio.google.com/app/apikey)
    - **Grok (xAI)**: ขอคีย์ได้ที่ [xAI Console](https://console.x.ai)
    - **Meta AI (Llama 3)**: ขอคีย์ฟรีได้ที่ [Groq Cloud](https://console.groq.com/keys)
 3. กด **"บันทึกการตั้งค่า"** (คีย์จะถูกบันทึกไว้ใน LocalStorage ในเครื่องของคุณอย่างปลอดภัย 100%)
+
+### 🤖 Free AI Video Generation (ฟรี 100% - ไม่ต้องบัตรเครดิต)
+1. คลิกที่แท็บ **"🤖 Free AI"** ในแผงด้านซ้าย
+2. ใส่ API Key ตามต้องการ:
+   - **Hugging Face API Key** (แนะนำ - ฟรีไม่จำกัด):
+     - ไปที่ https://huggingface.co/settings/tokens
+     - กด "New token" → ชื่อว่า "affilimate-video" → Role: "Read" → Generate
+     - คัดลอก token (ขึ้นต้นด้วย `hf_`)
+   - **Replicate API Key** (สำรอง - เครดิตฟรี $10/เดือน):
+     - ไปที่ https://replicate.com/account/api-tokens
+     - กด "Create token" → คัดลอก token (ขึ้นต้นด้วย `r8_`)
+3. เลือก **"ใช้โมเดลในเครื่อง"** ถ้าต้องการทำงานออฟไลน์ 100%
+4. กด **"🚀 สร้างวิดีโอด้วย AI ฟรี"** ระบบจะสร้างรูปภาพทุกฉากและประกอบวิดีโอให้อัตโนมัติ
+
+> 💡 **แนะนำ**: ใช้ **Hugging Face API Key** เพียงอย่างเดียวก็เพียงพอแล้ว SDXL Turbo สร้างรูปคุณภาพสูง เร็วมาก ฟรีจริง ไม่มี rate limit ที่รุนแรง
+
+---
+
+## 📖 คู่มือละเอียด
+
+ดูคู่มือการใช้งาน Free AI Video Generation เต็มรูปแบบได้ที่: [FREE_AI_GUIDE.md](FREE_AI_GUIDE.md)

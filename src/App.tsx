@@ -16,6 +16,8 @@ import { ProductScriptForm, PRESET_PRODUCTS } from './components/ProductScriptFo
 import { VideoStudioPlayer } from './components/VideoStudioPlayer';
 import { SceneTimelineEditor } from './components/SceneTimelineEditor';
 import { AudioMixerPanel } from './components/AudioMixerPanel';
+import { FreeAIConfigPanel } from './components/FreeAIConfigPanel';
+import { FreeAIVideoConfig } from './services/freeAIVideoService';
 
 const LOCAL_STORAGE_KEY_KEYS = 'affilimate_ai_api_keys_v1';
 
@@ -64,6 +66,14 @@ export const App: React.FC = () => {
   const [tone, setTone] = useState<ToneStyle>('energetic-seller');
   const [targetAudience, setTargetAudience] = useState<TargetAudience>('general');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+  // Free AI Video Generation config
+  const [freeAIConfig, setFreeAIConfig] = useState<FreeAIVideoConfig>({
+    hfApiKey: '',
+    replicateApiKey: '',
+    useLocalModels: false
+  });
+  const [isFreeAIGenerating, setIsFreeAIGenerating] = useState(false);
 
   // Audio settings
   const [ttsVoice, setTtsVoice] = useState<string>('');
@@ -227,6 +237,67 @@ export const App: React.FC = () => {
     setCurrentSceneIndex(0);
   };
 
+  // Generate video with Free AI
+  const handleGenerateWithFreeAI = async () => {
+    setIsFreeAIGenerating(true);
+    
+    try {
+      // First, generate the script if not already done
+      const result = await generateAffiliateScript({
+        productName,
+        productCategory,
+        productFeatures,
+        productPrice,
+        originalPrice,
+        affiliatePlatform,
+        targetAudience,
+        tone,
+        formula,
+        engine: currentEngine,
+        apiKeys,
+        shopeeData,
+        customPromptOptions,
+      });
+
+      setScenes(result.scenes);
+      setCaption(result.caption);
+      setHashtags(result.hashtags);
+      setCurrentSceneIndex(0);
+
+      // Then generate images for each scene using free AI
+      const { generateSceneImages } = await import('./services/freeAIVideoService');
+      const sceneImages = await generateSceneImages(currentProject, freeAIConfig);
+      
+      // Load the generated images
+      for (const [sceneId, imageUrl] of sceneImages.entries()) {
+        try {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.src = imageUrl;
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => {
+              handleImageLoaded(imageUrl, img);
+              resolve();
+            };
+            img.onerror = reject;
+          });
+        } catch (e) {
+          console.warn('Failed to load generated image:', sceneId, e);
+        }
+      }
+
+      // The video will be rendered using the existing canvas renderer + video recorder
+      // User can then click Export to render the final video
+      alert('สร้างรูปภาพด้วย AI ฟรีเสร็จสิ้น! กดปุ่ม "Export Video" เพื่อเรนเดอร์วิดีโอ 최종');
+      
+    } catch (error) {
+      console.error('Free AI generation failed:', error);
+      alert(`เกิดข้อผิดพลาด: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsFreeAIGenerating(false);
+    }
+  };
+
   // Update a single scene
   const handleUpdateScene = (idx: number, updatedScene: Scene) => {
     const newScenes = [...scenes];
@@ -282,7 +353,7 @@ export const App: React.FC = () => {
       {/* Main Workspace Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Product & AI Generator Form + Audio Mixer (5 cols) */}
+          {/* Left Column: Product & AI Generator Form + Audio Mixer + Free AI Config (5 cols) */}
           <div className="lg:col-span-5 space-y-6">
             <ProductScriptForm
               productName={productName}
@@ -312,6 +383,13 @@ export const App: React.FC = () => {
               onOpenPromptModal={() => setIsPromptModalOpen(true)}
               shopeeData={shopeeData}
               customPromptOptions={customPromptOptions}
+            />
+
+            <FreeAIConfigPanel
+              config={freeAIConfig}
+              onConfigChange={setFreeAIConfig}
+              isGenerating={isFreeAIGenerating}
+              onGenerateVideo={handleGenerateWithFreeAI}
             />
 
             <AudioMixerPanel
