@@ -3,6 +3,7 @@
 class AudioService {
   private ctx: AudioContext | null = null;
   private bgmGain: GainNode | null = null;
+  private bgmVolume: number = 0.22;
   private isBgmPlaying: boolean = false;
   private bgmInterval: any = null;
   private availableVoices: SpeechSynthesisVoice[] = [];
@@ -322,15 +323,20 @@ class AudioService {
   }
 
   public setBgmVolume(volume: number) {
+    this.bgmVolume = Math.max(0, Math.min(1, volume));
     if (this.bgmGain && this.ctx) {
-      this.bgmGain.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), this.ctx.currentTime);
+      this.bgmGain.gain.setValueAtTime(this.bgmVolume, this.ctx.currentTime);
     }
   }
 
   // Audio ducking when voiceover is active
   private duckBgm(isDucking: boolean) {
     if (this.bgmGain && this.ctx) {
-      const targetVolume = isDucking ? 0.06 : 0.22;
+      // Restore to the volume the user actually set on the mixer, not a
+      // hardcoded constant - otherwise the slider stops working after the
+      // first voiceover ends.
+      const base = this.bgmVolume * 0.4;
+      const targetVolume = isDucking ? Math.min(0.06, base) : base;
       this.bgmGain.gain.cancelScheduledValues(this.ctx.currentTime);
       this.bgmGain.gain.linearRampToValueAtTime(targetVolume, this.ctx.currentTime + 0.2);
     }

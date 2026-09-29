@@ -1,6 +1,6 @@
 import React from 'react';
 import { AIEngine, ApiKeys } from '../types';
-import { Sparkles, Key, BookOpen, Download, Wand2, Zap, PlayCircle, ShoppingBag, Sliders, Tag } from 'lucide-react';
+import { Sparkles, Key, Download, Zap, PlayCircle, ShoppingBag, Sliders } from 'lucide-react';
 
 interface NavbarProps {
   currentEngine: AIEngine;

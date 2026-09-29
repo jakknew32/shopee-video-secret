@@ -1,4 +1,4 @@
-import { Scene, VideoProject } from '../types';
+import { VideoProject } from '../types';
 
 // Free AI Video Generation Services
 export interface FreeAIVideoConfig {
@@ -117,11 +117,11 @@ export async function generateSceneImages(
         }
         
         // Fallback to placeholder/Unsplash
-        const placeholderUrl = generatePlaceholderImage(scene.aiImagePrompt, project.productName);
+        const placeholderUrl = generatePlaceholderImage(scene.aiImagePrompt);
         imageUrls.set(scene.id, placeholderUrl);
       } catch (error) {
         console.warn(`Failed to generate image for scene ${scene.id}:`, error);
-        const placeholderUrl = generatePlaceholderImage(scene.aiImagePrompt, project.productName);
+        const placeholderUrl = generatePlaceholderImage(scene.aiImagePrompt);
         imageUrls.set(scene.id, placeholderUrl);
       }
     }
@@ -195,20 +195,32 @@ async function generateImageReplicate(prompt: string, apiKey: string): Promise<s
     
     const prediction = await startResponse.json();
     
-    // Poll for completion
+    // Poll for completion, but never unbounded - a stuck prediction would
+    // otherwise hang the UI forever since callers await this.
+    const MAX_ATTEMPTS = 90; // 90 * 2s = 3 minutes
     let result = prediction;
-    while (result.status === 'starting' || result.status === 'processing') {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (result.status !== 'starting' && result.status !== 'processing') break;
       await new Promise(resolve => setTimeout(resolve, 2000));
       const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
         headers: {
           'Authorization': `Token ${apiKey}`,
         },
       });
+      if (!pollResponse.ok) {
+        throw new Error(`Replicate poll error: ${pollResponse.status}`);
+      }
       result = await pollResponse.json();
     }
-    
-    if (result.status === 'succeeded' && result.output && result.output.length > 0) {
-      return result.output[0];
+
+    if (result.status === 'starting' || result.status === 'processing') {
+      throw new Error('Replicate prediction timed out after 3 minutes');
+    }
+
+    // `output` may be a bare string or an array depending on the model version.
+    if (result.status === 'succeeded' && result.output) {
+      const first = Array.isArray(result.output) ? result.output[0] : result.output;
+      if (typeof first === 'string' && first) return first;
     }
     
     throw new Error(`Replicate prediction failed: ${result.error}`);
@@ -218,105 +230,8 @@ async function generateImageReplicate(prompt: string, apiKey: string): Promise<s
   }
 }
 
-// Generate video from images using free video generation models
-export async function generateVideoFromImages(
-  imageUrls: string[],
-  project: VideoProject,
-  config: FreeAIVideoConfig
-): Promise<string | null> {
-  // For now, we'll use the existing canvas-based rendering
-  // In the future, we can integrate with:
-  // - Stable Video Diffusion (image-to-video)
-  // - AnimateDiff (for adding motion to static images)
-  // - ModelScope (text-to-video)
-  
-  // This would be implemented based on the chosen model
-  console.log('Video generation from images would use:', imageUrls.length, 'images');
-  return null;
-}
-
-// Generate video directly from text prompt using free models
-export async function generateVideoFromText(
-  prompt: string,
-  config: FreeAIVideoConfig
-): Promise<string | null> {
-  if (!config.hfApiKey && !config.replicateApiKey) {
-    console.warn('No API keys configured for free video generation');
-    return null;
-  }
-  
-  // Try ModelScope on Hugging Face
-  if (config.hfApiKey) {
-    try {
-      const response = await fetch(
-        'https://api-inference.huggingface.co/models/damo-vilab/modelscope-damo-text-to-video-synthesis',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${config.hfApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              num_frames: 16,
-              height: 256,
-              width: 256,
-            }
-          }),
-        }
-      );
-      
-      if (response.ok) {
-        const blob = await response.blob();
-        return URL.createObjectURL(blob);
-      }
-    } catch (error) {
-      console.error('ModelScope video generation failed:', error);
-    }
-  }
-  
-  // Try ZeroScope on Hugging Face
-  if (config.hfApiKey) {
-    try {
-      const response = await fetch(
-        'https://api-inference.huggingface.co/models/cerspense/zeroscope_v2_576w',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${config.hfApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              num_frames: 24,
-              height: 320,
-              width: 576,
-            }
-          }),
-        }
-      );
-      
-      if (response.ok) {
-        const blob = await response.blob();
-        return URL.createObjectURL(blob);
-      }
-    } catch (error) {
-      console.error('ZeroScope video generation failed:', error);
-    }
-  }
-  
-  // Try Replicate for Stable Video Diffusion
-  if (config.replicateApiKey) {
-    // Would need an initial image first - could be implemented later
-  }
-  
-  return null;
-}
-
 // Generate placeholder images using Unsplash or generated URLs
-function generatePlaceholderImage(prompt: string, productName: string): string {
+function generatePlaceholderImage(prompt: string): string {
   // Use relevant Unsplash images based on product category
   const categories = {
     'electronics': 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=576&h=1024&q=80',
@@ -343,43 +258,3 @@ function generatePlaceholderImage(prompt: string, productName: string): string {
   
   return categories.default;
 }
-
-// Enhanced video generation pipeline using free AI
-export class FreeAIVideoPipeline {
-  private config: FreeAIVideoConfig;
-  
-  constructor(config: FreeAIVideoConfig) {
-    this.config = config;
-  }
-  
-  async generateCompleteVideo(project: VideoProject): Promise<Blob | null> {
-    // Step 1: Generate images for all scenes
-    console.log('Generating scene images...');
-    const sceneImages = await generateSceneImages(project, this.config);
-    
-    // Step 2: Optionally enhance with image-to-video for each scene
-    // This would create short video clips for each scene
-    
-    // Step 3: Use existing canvas renderer to composite final video
-    // This is already implemented in videoRecorder.ts
-    
-    // For now, return null to indicate we should use the existing renderer
-    // The existing canvasRenderer + videoRecorder pipeline is actually better
-    // for creating the styled TikTok/Reels videos with subtitles, stickers, etc.
-    return null;
-  }
-  
-  // Generate AI-powered script using free LLMs
-  async generateScriptWithFreeLLM(params: any): Promise<any> {
-    // Could integrate with:
-    // - Hugging Face Inference API for LLMs (Llama, Mistral, etc.)
-    // - Groq API (free tier for Llama 3)
-    // - Together AI (free credits)
-    // - Local transformers.js models
-    
-    // For now, fall back to the existing smart template system
-    return null;
-  }
-}
-
-export const freeAIVideoPipeline = new FreeAIVideoPipeline({});

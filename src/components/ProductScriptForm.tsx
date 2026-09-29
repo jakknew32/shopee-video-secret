@@ -1,8 +1,7 @@
 import React from 'react';
 import { CustomPromptOptions, Platform, ScriptFormula, ShopeeProductData, TargetAudience, ToneStyle } from '../types';
 import {
-  Sparkles, ShoppingBag, Tag, Layers, MessageSquare,
-  Zap, Loader2, RefreshCw, Sliders, ExternalLink, Image as ImageIcon, Star
+  Sparkles, ShoppingBag, Tag, Layers, Zap, Loader2, Sliders, Image as Star
 } from 'lucide-react';
 
 interface ProductScriptFormProps {

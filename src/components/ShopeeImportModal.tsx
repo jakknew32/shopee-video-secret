@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { ShopeeProductData } from '../types';
 import { parseShopeeInput, SHOPEE_SAMPLE_DATABASE, preloadShopeeImage, fetchShopeeProductData } from '../services/shopeeService';
 import {
-  X, ShoppingBag, Link as LinkIcon, Sparkles, Check,
-  Image as ImageIcon, Star, MapPin, Tag, ArrowRight, Loader2, RefreshCw
+  X, ShoppingBag, Link as LinkIcon, Sparkles, Image as ImageIcon, Star, ArrowRight, Loader2, RefreshCw
 } from 'lucide-react';
 
 interface ShopeeImportModalProps {

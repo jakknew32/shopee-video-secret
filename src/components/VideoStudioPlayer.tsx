@@ -1,11 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Scene, VideoProject } from '../types';
+import { VideoProject } from '../types';
 import { canvasRenderer } from '../services/canvasRenderer';
 import { audioService } from '../services/audioService';
 import {
   Play, Pause, RotateCcw, Volume2, VolumeX, Eye, EyeOff,
-  Heart, MessageCircle, Bookmark, Share2, Music, Sparkles,
-  ChevronLeft, ChevronRight, Maximize2
+  Heart, MessageCircle, Bookmark, Share2, Music, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface VideoStudioPlayerProps {
@@ -30,10 +29,12 @@ export const VideoStudioPlayer: React.FC<VideoStudioPlayerProps> = ({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [showTikTokUi, setShowTikTokUi] = useState<boolean>(true);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const animationFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  // Mirrors `currentTime` for the RAF loop, which must not read state inside
+  // its own updater. Kept in sync by every place that seeks.
+  const timeRef = useRef<number>(0);
 
   const totalDuration = project.scenes.reduce((acc, s) => acc + (s.duration || 4), 0);
 
@@ -61,10 +62,18 @@ export const VideoStudioPlayer: React.FC<VideoStudioPlayerProps> = ({
     };
   }, [project.scenes]);
 
+  // App.tsx rebuilds `project` as a fresh object literal on every render, so it
+  // cannot be a dependency of the RAF loop - that would tear down and restart
+  // playback (cancelling speech mid-sentence) roughly 60x/second. Keep it in a
+  // ref so the loop always sees fresh data without re-subscribing.
+  const projectRef = useRef(project);
+  projectRef.current = project;
+
   // Render current frame
   const renderCurrentFrame = useCallback((time: number) => {
     const canvas = canvasRef.current;
-    if (!canvas || project.scenes.length === 0) return;
+    const p = projectRef.current;
+    if (!canvas || p.scenes.length === 0) return;
 
     const { scene, sceneProgress, index } = getSceneAtTime(time);
     const totalProgress = totalDuration > 0 ? time / totalDuration : 0;
@@ -76,14 +85,14 @@ export const VideoStudioPlayer: React.FC<VideoStudioPlayerProps> = ({
       totalProgress,
       currentTime: time,
       totalTime: totalDuration,
-      productName: project.productName,
+      productName: p.productName,
       imageElement: img,
     });
 
     if (index !== currentSceneIndex) {
       setCurrentSceneIndex(index);
     }
-  }, [getSceneAtTime, loadedImages, project.productName, project.scenes.length, totalDuration, currentSceneIndex, setCurrentSceneIndex]);
+  }, [getSceneAtTime, loadedImages, totalDuration, currentSceneIndex, setCurrentSceneIndex]);
 
   // Redraw when project scenes or time change while paused
   useEffect(() => {
@@ -103,15 +112,17 @@ export const VideoStudioPlayer: React.FC<VideoStudioPlayerProps> = ({
     }
 
     lastTimeRef.current = performance.now();
+    timeRef.current = currentTime;
+    const startProject = projectRef.current;
 
     // Trigger voiceover for starting scene
     const initialSceneInfo = getSceneAtTime(currentTime);
     if (!isMuted && initialSceneInfo.scene.voiceText) {
       audioService.speak(
         initialSceneInfo.scene.voiceText,
-        project.ttsVoice,
-        project.ttsRate,
-        project.ttsPitch
+        startProject.ttsVoice,
+        startProject.ttsRate,
+        startProject.ttsPitch
       );
       if (initialSceneInfo.scene.soundEffect) {
         audioService.playSoundEffect(initialSceneInfo.scene.soundEffect);
@@ -123,48 +134,52 @@ export const VideoStudioPlayer: React.FC<VideoStudioPlayerProps> = ({
     const tick = (now: number) => {
       const deltaSec = (now - lastTimeRef.current) / 1000;
       lastTimeRef.current = now;
+      const p = projectRef.current;
 
-      setCurrentTime((prevTime) => {
-        let nextTime = prevTime + deltaSec;
+      // Advance time via a ref and mirror it into state, so the audio/render
+      // side effects below run exactly once per frame. They must not live
+      // inside a setState updater: React may call updaters more than once
+      // (StrictMode double-invokes them), which would replay speech and SFX.
+      let nextTime = timeRef.current + deltaSec;
 
-        if (nextTime >= totalDuration) {
-          // Loop back to start
-          nextTime = 0;
-          prevSceneIdx = 0;
-          if (!isMuted && project.scenes[0]?.voiceText) {
+      if (nextTime >= totalDuration) {
+        // Loop back to start
+        nextTime = 0;
+        prevSceneIdx = 0;
+        if (!isMuted && p.scenes[0]?.voiceText) {
+          audioService.speak(
+            p.scenes[0].voiceText,
+            p.ttsVoice,
+            p.ttsRate,
+            p.ttsPitch
+          );
+        }
+      }
+
+      const sceneInfo = getSceneAtTime(nextTime);
+
+      // When entering a new scene during playback
+      if (sceneInfo.index !== prevSceneIdx) {
+        prevSceneIdx = sceneInfo.index;
+        if (!isMuted) {
+          if (sceneInfo.scene.soundEffect) {
+            audioService.playSoundEffect(sceneInfo.scene.soundEffect);
+          }
+          if (sceneInfo.scene.voiceText) {
             audioService.speak(
-              project.scenes[0].voiceText,
-              project.ttsVoice,
-              project.ttsRate,
-              project.ttsPitch
+              sceneInfo.scene.voiceText,
+              p.ttsVoice,
+              p.ttsRate,
+              p.ttsPitch
             );
           }
         }
+      }
 
-        const sceneInfo = getSceneAtTime(nextTime);
-
-        // When entering a new scene during playback
-        if (sceneInfo.index !== prevSceneIdx) {
-          prevSceneIdx = sceneInfo.index;
-          if (!isMuted) {
-            if (sceneInfo.scene.soundEffect) {
-              audioService.playSoundEffect(sceneInfo.scene.soundEffect);
-            }
-            if (sceneInfo.scene.voiceText) {
-              audioService.speak(
-                sceneInfo.scene.voiceText,
-                project.ttsVoice,
-                project.ttsRate,
-                project.ttsPitch
-              );
-            }
-          }
-        }
-
-        renderCurrentFrame(nextTime);
-        if (onSceneTimeUpdate) onSceneTimeUpdate(nextTime);
-        return nextTime;
-      });
+      timeRef.current = nextTime;
+      renderCurrentFrame(nextTime);
+      if (onSceneTimeUpdate) onSceneTimeUpdate(nextTime);
+      setCurrentTime(nextTime);
 
       animationFrameRef.current = requestAnimationFrame(tick);
     };
@@ -177,7 +192,7 @@ export const VideoStudioPlayer: React.FC<VideoStudioPlayerProps> = ({
       }
       audioService.stopSpeaking();
     };
-  }, [isPlaying, totalDuration, getSceneAtTime, isMuted, project, renderCurrentFrame, onSceneTimeUpdate]);
+  }, [isPlaying, totalDuration, getSceneAtTime, isMuted, renderCurrentFrame, onSceneTimeUpdate]);
 
   const handleTogglePlay = () => {
     setIsPlaying(!isPlaying);
@@ -185,6 +200,7 @@ export const VideoStudioPlayer: React.FC<VideoStudioPlayerProps> = ({
 
   const handleReset = () => {
     setIsPlaying(false);
+    timeRef.current = 0;
     setCurrentTime(0);
     setCurrentSceneIndex(0);
     renderCurrentFrame(0);
@@ -193,6 +209,7 @@ export const VideoStudioPlayer: React.FC<VideoStudioPlayerProps> = ({
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
+    timeRef.current = val;
     setCurrentTime(val);
     renderCurrentFrame(val);
     const { index, scene } = getSceneAtTime(val);
@@ -207,6 +224,7 @@ export const VideoStudioPlayer: React.FC<VideoStudioPlayerProps> = ({
     for (let i = 0; i < idx; i++) {
       t += project.scenes[i].duration || 4;
     }
+    timeRef.current = t;
     setCurrentTime(t);
     setCurrentSceneIndex(idx);
     renderCurrentFrame(t);

@@ -20,7 +20,6 @@ export const FreeAIConfigPanel: React.FC<FreeAIConfigPanelProps> = ({
   const [replicateApiKey, setReplicateApiKey] = useState(config.replicateApiKey || '');
   const [useLocalModels, setUseLocalModels] = useState(config.useLocalModels || false);
   const [generationStatus, setGenerationStatus] = useState<string>('');
-  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     onConfigChange({
@@ -31,10 +30,10 @@ export const FreeAIConfigPanel: React.FC<FreeAIConfigPanelProps> = ({
   }, [hfApiKey, replicateApiKey, useLocalModels, onConfigChange]);
 
   const handleGenerateWithFreeAI = async () => {
-    setGenerationStatus('กำลังสร้างวิดีโอด้วย AI ฟรี...');
+    setGenerationStatus('กำลังสร้างรูปภาพด้วย AI ฟรี...');
     try {
       await onGenerateVideo();
-      setGenerationStatus('สร้างวิดีโอสำเร็จ!');
+      setGenerationStatus('สร้างรูปภาพสำเร็จ! กด "Export Video" เพื่อเรนเดอร์วิดีโอ');
     } catch (error) {
       setGenerationStatus(`เกิดข้อผิดพลาด: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -66,23 +65,6 @@ export const FreeAIConfigPanel: React.FC<FreeAIConfigPanelProps> = ({
       {generationStatus && (
         <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700 text-sm text-slate-300">
           {generationStatus}
-        </div>
-      )}
-
-      {generatedVideoUrl && (
-        <div className="space-y-2">
-          <video 
-            src={generatedVideoUrl} 
-            controls 
-            className="w-full max-h-64 rounded-xl border border-slate-700"
-          />
-          <a 
-            href={generatedVideoUrl} 
-            download="ai-generated-video.webm"
-            className="inline-block px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-xl hover:bg-blue-500/30 transition text-sm font-medium"
-          >
-            📥 ดาวน์โหลดวิดีโอ
-          </a>
         </div>
       )}
 

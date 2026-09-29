@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, BookOpen, Flame, Sparkles, Clock, AlertTriangle, TrendingUp, CheckCircle } from 'lucide-react';
+import { X, BookOpen, Flame, Sparkles, Clock, AlertTriangle } from 'lucide-react';
 
 interface AffiliateCheatSheetModalProps {
   isOpen: boolean;

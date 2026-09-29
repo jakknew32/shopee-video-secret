@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { CustomPromptOptions, PromptTemplate } from '../types';
+import { CustomPromptOptions } from '../types';
 import { PROMPT_TEMPLATES } from '../services/aiService';
 import {
   X, Sliders, Sparkles, User, MessageSquare,
-  ShieldAlert, Check, Copy, Eye, Zap, Flame, Lightbulb
+  ShieldAlert, Check, Copy, Eye
 } from 'lucide-react';
 
 interface PromptCustomizerModalProps {

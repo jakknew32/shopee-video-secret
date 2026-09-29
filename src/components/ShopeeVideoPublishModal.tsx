@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { VideoProject } from '../types';
 import {
   X, ShoppingBag, ExternalLink, Copy, Check, Sparkles,
-  Smartphone, Tag, Flame, AlertCircle, ArrowRight, Share2, CheckCircle2
+  Flame, ArrowRight
 } from 'lucide-react';
 
 interface ShopeeVideoPublishModalProps {

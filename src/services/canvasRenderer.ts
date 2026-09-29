@@ -167,8 +167,12 @@ export class CanvasRenderer {
   private drawParticles(ctx: CanvasRenderingContext2D, w: number, h: number, progress: number) {
     ctx.save();
     this.particles.forEach((p, i) => {
-      const curY = ((p.y - progress * p.speedY * 0.8 + 1) % 1) * h;
-      const curX = ((p.x + Math.sin(progress * 4 + i) * 0.05 + 1) % 1) * w;
+      // `((x % 1) + 1) % 1` keeps the value in [0,1); a bare `% 1` goes
+      // negative once progress passes ~5 and the particle draws off-canvas.
+      const yNorm = (((p.y - progress * p.speedY * 0.8) % 1) + 1) % 1;
+      const xNorm = (((p.x + Math.sin(progress * 4 + i) * 0.05) % 1) + 1) % 1;
+      const curY = yNorm * h;
+      const curX = xNorm * w;
 
       ctx.beginPath();
       ctx.arc(curX, curY, p.size * (w / 720), 0, Math.PI * 2);
@@ -280,7 +284,6 @@ export class CanvasRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const words = line.split(' ');
     const totalLineWidth = ctx.measureText(line).width;
 
     // Draw Background Pill if TikTok style
@@ -363,6 +366,10 @@ export class CanvasRenderer {
         this.drawShopeeVoucherBadge(ctx, stk.label || '🏷️ โค้ดลด Shopee Video 50%', 50, progress);
       } else if (stk.type === 'shopee-voucher-30') {
         this.drawShopeeVoucherBadge(ctx, stk.label || '🏷️ โค้ดลด Shopee Video 30%', 30, progress);
+      } else if (stk.type === 'shopee-deal') {
+        this.drawShopeeDealBadge(ctx, stk.label, progress);
+      } else if (stk.type === 'lazada-voucher') {
+        this.drawLazadaVoucherBadge(ctx, stk.label || '💙 โค้ดลด Lazada');
       } else if (stk.type === 'discount-50') {
         this.drawDiscountBadge(ctx, stk.label, progress);
       } else if (stk.type === 'flash-sale') {
@@ -510,6 +517,67 @@ export class CanvasRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label || '⚡ FLASH SALE', 0, 0);
+  }
+
+  // Shopee Deal badge (orange, bouncing) - previously fell through to the
+  // generic grey box even though aiService emits this type for Shopee CTAs.
+  private drawShopeeDealBadge(ctx: CanvasRenderingContext2D, label: string, progress: number) {
+    const bounce = Math.sin(progress * Math.PI * 6) * 5;
+    ctx.translate(0, bounce);
+
+    const width = 330;
+    const height = 60;
+
+    ctx.shadowColor = 'rgba(238, 77, 45, 0.6)';
+    ctx.shadowBlur = 16;
+
+    const grad = ctx.createLinearGradient(-width / 2, 0, width / 2, 0);
+    grad.addColorStop(0, '#EE4D2D');
+    grad.addColorStop(0.5, '#FF5722');
+    grad.addColorStop(1, '#FF8A65');
+
+    ctx.fillStyle = grad;
+    this.roundRect(ctx, -width / 2, -height / 2, width, height, 30);
+    ctx.fill();
+
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '800 21px Kanit, Prompt, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label || '🧡 พิกัด Shopee ในคอมเมนต์', 0, 0);
+  }
+
+  // Lazada voucher badge
+  private drawLazadaVoucherBadge(ctx: CanvasRenderingContext2D, label: string) {
+    const width = 300;
+    const height = 50;
+
+    ctx.shadowColor = 'rgba(0, 90, 255, 0.5)';
+    ctx.shadowBlur = 12;
+
+    const grad = ctx.createLinearGradient(-width / 2, 0, width / 2, 0);
+    grad.addColorStop(0, '#0F46C9');
+    grad.addColorStop(1, '#00A1E4');
+
+    ctx.fillStyle = grad;
+    this.roundRect(ctx, -width / 2, -height / 2, width, height, 25);
+    ctx.fill();
+
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '800 20px Kanit, Prompt, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, 0, 0);
   }
 
   private drawDiscountBadge(ctx: CanvasRenderingContext2D, label: string, _progress: number) {

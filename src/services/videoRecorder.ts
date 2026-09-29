@@ -1,4 +1,4 @@
-import { Scene, VideoProject } from '../types';
+import { VideoProject } from '../types';
 import { canvasRenderer } from './canvasRenderer';
 import { audioService } from './audioService';
 
@@ -12,7 +12,6 @@ export interface ExportProgress {
 export class VideoRecorderService {
   private mediaRecorder: MediaRecorder | null = null;
   private recordedChunks: Blob[] = [];
-  private isRecording: boolean = false;
   private shouldCancel: boolean = false;
 
   public async renderAndExportVideo(
@@ -21,11 +20,9 @@ export class VideoRecorderService {
     loadedImages: Map<string, HTMLImageElement>,
     onProgress: (progress: ExportProgress) => void
   ): Promise<Blob> {
-    this.isRecording = true;
     this.shouldCancel = false;
     this.recordedChunks = [];
 
-    const totalScenes = project.scenes.length;
     const totalDurationSec = project.scenes.reduce((acc, s) => acc + (s.duration || 4), 0);
 
     // Prepare Canvas stream at 30 fps
@@ -68,12 +65,10 @@ export class VideoRecorderService {
 
       this.mediaRecorder.onstop = () => {
         const blob = new Blob(this.recordedChunks, { type: mimeType || 'video/webm' });
-        this.isRecording = false;
         resolve(blob);
       };
 
       this.mediaRecorder.onerror = (e) => {
-        this.isRecording = false;
         reject(e);
       };
 
@@ -170,7 +165,6 @@ export class VideoRecorderService {
       this.mediaRecorder.stop();
     }
     audioService.stopSpeaking();
-    this.isRecording = false;
   }
 }
 

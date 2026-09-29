@@ -3,8 +3,8 @@ import {
   AIEngine, ApiKeys, CustomPromptOptions, Platform, Scene, ScriptFormula,
   ShopeeProductData, TargetAudience, ToneStyle, VideoProject
 } from './types';
-import { generateAffiliateScript, generateSmartAffiliateScript, PROMPT_TEMPLATES } from './services/aiService';
-import { preloadShopeeImage, SHOPEE_SAMPLE_DATABASE } from './services/shopeeService';
+import { generateAffiliateScript, generateSmartAffiliateScript } from './services/aiService';
+import { preloadShopeeImage } from './services/shopeeService';
 import { Navbar } from './components/Navbar';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { AffiliateCheatSheetModal } from './components/AffiliateCheatSheetModal';
@@ -17,7 +17,7 @@ import { VideoStudioPlayer } from './components/VideoStudioPlayer';
 import { SceneTimelineEditor } from './components/SceneTimelineEditor';
 import { AudioMixerPanel } from './components/AudioMixerPanel';
 import { FreeAIConfigPanel } from './components/FreeAIConfigPanel';
-import { FreeAIVideoConfig } from './services/freeAIVideoService';
+import { FreeAIVideoConfig, generateSceneImages } from './services/freeAIVideoService';
 
 const LOCAL_STORAGE_KEY_KEYS = 'affilimate_ai_api_keys_v1';
 
@@ -264,12 +264,21 @@ export const App: React.FC = () => {
       setHashtags(result.hashtags);
       setCurrentSceneIndex(0);
 
-      // Then generate images for each scene using free AI
-      const { generateSceneImages } = await import('./services/freeAIVideoService');
-      const sceneImages = await generateSceneImages(currentProject, freeAIConfig);
-      
-      // Load the generated images
+      // Then generate images for each scene using free AI.
+      // Build the project from the freshly generated scenes - `currentProject`
+      // is from the previous render and would still hold the old scenes.
+      const draftProject: VideoProject = { ...currentProject, scenes: result.scenes };
+      const sceneImages = await generateSceneImages(draftProject, freeAIConfig);
+
+      // Attach each generated image to its scene AND preload it into the
+      // canvas image cache. Updating `mediaUrl` is what makes the image
+      // actually visible in the player, which reads `loadedImages.get(scene.mediaUrl)`.
+      const newScenes = [...result.scenes];
+      let loaded = 0;
       for (const [sceneId, imageUrl] of sceneImages.entries()) {
+        const idx = newScenes.findIndex(s => s.id === sceneId);
+        if (idx === -1) continue;
+        newScenes[idx] = { ...newScenes[idx], mediaType: 'image', mediaUrl: imageUrl };
         try {
           const img = new Image();
           img.crossOrigin = 'anonymous';
@@ -281,18 +290,25 @@ export const App: React.FC = () => {
             };
             img.onerror = reject;
           });
+          loaded++;
         } catch (e) {
           console.warn('Failed to load generated image:', sceneId, e);
         }
       }
+      setScenes(newScenes);
 
-      // The video will be rendered using the existing canvas renderer + video recorder
-      // User can then click Export to render the final video
-      alert('สร้างรูปภาพด้วย AI ฟรีเสร็จสิ้น! กดปุ่ม "Export Video" เพื่อเรนเดอร์วิดีโอ 최종');
-      
+      // The video itself is rendered by the canvas renderer + video recorder
+      // when the user clicks Export.
+      alert(
+        `สร้างรูปภาพด้วย AI ฟรีเสร็จสิ้น! โหลดสำเร็จ ${loaded}/${sceneImages.size} รูป ` +
+        `กดปุ่ม "Export Video" เพื่อเรนเดอร์วิดีโอ`
+      );
+
     } catch (error) {
       console.error('Free AI generation failed:', error);
-      alert(`เกิดข้อผิดพลาด: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Rethrow so FreeAIConfigPanel's catch can show the failure - the panel
+      // reports success whenever this promise resolves.
+      throw error;
     } finally {
       setIsFreeAIGenerating(false);
     }

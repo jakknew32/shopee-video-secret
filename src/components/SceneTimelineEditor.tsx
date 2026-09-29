@@ -1,9 +1,8 @@
-import React, { useRef } from 'react';
-import { Scene, KenBurnsEffect, SubtitleStyle, StickerType } from '../types';
+import React from 'react';
+import { Scene, KenBurnsEffect, StickerType } from '../types';
 import { audioService } from '../services/audioService';
 import {
-  Volume2, Image as ImageIcon, Sparkles, Sliders,
-  Trash2, Upload, Plus, MoveVertical, Copy, Check, Eye
+  Volume2, Image as Sparkles, Trash2, Upload, Copy, Check
 } from 'lucide-react';
 
 interface SceneTimelineEditorProps {
@@ -27,12 +26,19 @@ export const SceneTimelineEditor: React.FC<SceneTimelineEditorProps> = ({
   ttsRate,
   ttsPitch,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [copiedPromptId, setCopiedPromptId] = React.useState<string | null>(null);
 
   const handleFieldChange = (idx: number, field: keyof Scene, value: any) => {
     const updated = { ...scenes[idx], [field]: value };
     onUpdateScene(idx, updated);
+  };
+
+  // Applies several field changes to the same scene at once. These must be a
+  // single update: calling handleFieldChange twice in a row would build both
+  // objects from the same stale `scenes` prop, so the second write would revert
+  // the first (e.g. dropping mediaUrl right after setting it).
+  const handleFieldsChange = (idx: number, patch: Partial<Scene>) => {
+    onUpdateScene(idx, { ...scenes[idx], ...patch });
   };
 
   const handleTestVoice = (text: string) => {
@@ -58,8 +64,7 @@ export const SceneTimelineEditor: React.FC<SceneTimelineEditorProps> = ({
         img.crossOrigin = 'anonymous';
         img.onload = () => {
           onImageUploaded(dataUrl, img);
-          handleFieldChange(sceneIdx, 'mediaUrl', dataUrl);
-          handleFieldChange(sceneIdx, 'mediaType', 'image');
+          handleFieldsChange(sceneIdx, { mediaUrl: dataUrl, mediaType: 'image' });
         };
         img.src = dataUrl;
       }

@@ -303,9 +303,11 @@ export function generateSmartAffiliateScript(params: GenerateScriptParams): Gene
     }
   ];
 
-  // Hashtags
+  // Hashtags. Thai text has no spaces, so slicing on length cuts mid-word and
+  // produces a broken tag - use the first meaningful word/segment instead.
+  const nameForTag = productName.split(/[\s,|]+/).find(w => w.length >= 3) || productName;
   const baseTags = [
-    `#${productName.replace(/\s+/g, '').slice(0, 15)}`,
+    `#${nameForTag.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 15)}`,
     '#รีวิวของดี',
     '#ของดีบอกต่อ',
     '#ของมันต้องมี',
@@ -334,11 +336,16 @@ export function generateSmartAffiliateScript(params: GenerateScriptParams): Gene
 
 // Google Gemini API Engine
 async function callGeminiApi(apiKey: string, prompt: string, temperature: number = 0.7): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // Key goes in the `x-goog-api-key` header, not a `?key=` query param - query
+  // strings end up in server access logs, browser history and Referer headers.
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {

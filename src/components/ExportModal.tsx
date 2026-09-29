@@ -1,7 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { VideoProject } from '../types';
-import { generateVideo } from '../services/videoGenerator';
-import { ExportProgress } from '../services/videoRecorder';
+import { videoRecorderService, ExportProgress } from '../services/videoRecorder';
 import confetti from 'canvas-confetti';
 import {
   X,
@@ -10,7 +9,6 @@ import {
   Check,
   Sparkles,
   Film,
-  Share2,
   ExternalLink,
   Loader2,
   CheckCircle2,
@@ -51,21 +49,60 @@ const ExportModal: React.FC<ExportModalProps> = ({
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   const hiddenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoUrlRef = useRef<string | null>(null);
+
+  // Release the previous object URL when replaced, and on unmount, so repeated
+  // renders do not leak the recorded blobs for the lifetime of the page.
+  useEffect(() => {
+    if (videoUrlRef.current) {
+      URL.revokeObjectURL(videoUrlRef.current);
+      videoUrlRef.current = null;
+    }
+  }, [videoUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
+    };
+  }, []);
 
   if (!isOpen) return null;
 
+  const handleCancelRender = () => {
+    videoRecorderService.cancel();
+    setIsRendering(false);
+  };
+
   const handleStartRender = async () => {
+    const canvas = hiddenCanvasRef.current;
+    if (!canvas) {
+      alert('ไม่พบแคนวาสสำหรับเรนเดอร์ กรุณาลองใหม่อีกครั้ง');
+      return;
+    }
+
     setIsRendering(true);
     setVideoBlob(null);
     setVideoUrl(null);
-
-    const imageUrls = Array.from(loadedImages.keys()) as string[];
+    setProgress({
+      percent: 0,
+      currentScene: 1,
+      totalScenes: project.scenes.length,
+      status: 'พร้อมเริ่มเรนเดอร์วิดีโอ 9:16',
+    });
 
     try {
-      const blob = await generateVideo(imageUrls, { fps: 25, frameDuration: 2 });
+      // Renders every scene through canvasRenderer (Ken Burns, subtitles,
+      // stickers, progress bar) and mixes in TTS + BGM + SFX via audioService.
+      const blob = await videoRecorderService.renderAndExportVideo(
+        canvas,
+        project,
+        loadedImages,
+        (p) => setProgress(p)
+      );
 
       setVideoBlob(blob);
       const url = URL.createObjectURL(blob);
+      videoUrlRef.current = url;
       setVideoUrl(url);
 
       confetti({
@@ -133,6 +170,9 @@ const ExportModal: React.FC<ExportModalProps> = ({
                   <span className="font-mono font-bold text-white">{progress.percent}%</span>
                 </div>
                 <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-rose-500 to-pink-500 transition-all duration-150" style={{ width: `${progress.percent}%` }} /></div>
+                <button type="button" onClick={handleCancelRender} className="px-3 py-1.5 text-[11px] text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 rounded-lg transition">
+                  ยกเลิกการเรนเดอร์
+                </button>
               </div>
             )}
             {videoUrl && (

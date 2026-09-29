@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { audioService } from '../services/audioService';
-import { Volume2, Music, Mic, Play, Square, Sliders } from 'lucide-react';
+import { Volume2, Music, Mic, Play, Square } from 'lucide-react';
 
 interface AudioMixerPanelProps {
   ttsVoice: string;
@@ -46,8 +46,19 @@ export const AudioMixerPanel: React.FC<AudioMixerPanelProps> = ({
 
     loadVoices();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = loadVoices;
+      // addEventListener, not `onvoiceschanged =` - assigning the property
+      // would clobber the handler audioService installs to refresh its own
+      // voice cache, leaving speak() with a stale list.
+      window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
     }
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+      }
+      // stopBgm clears the setInterval created by startProceduralBgm.
+      audioService.stopBgm();
+      audioService.stopSpeaking();
+    };
   }, [ttsVoice, setTtsVoice]);
 
   const handleToggleBgm = () => {
